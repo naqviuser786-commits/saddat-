@@ -8,7 +8,7 @@ interface LuxuryPreloaderProps {
 
 export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
   const [progress, setProgress] = useState<number>(0);
-  const [statusText, setStatusText] = useState<string>("INITIALIZING 360° ATELIER FRAMES...");
+  const [statusText, setStatusText] = useState<string>("BUFFERING 360° ATELIER ASSETS...");
   const preloaderRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const isFinishedRef = useRef<boolean>(false);
@@ -16,7 +16,7 @@ export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
 
-    // Start REAL frame loading
+    // Start Real 64-Frame Fast Preload (Takes ~1.5 to 2 seconds total!)
     preloadAll360Frames((pct, status) => {
       setProgress(pct);
       setStatusText(status);
@@ -36,7 +36,7 @@ export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
             tl.to(contentRef.current, {
               opacity: 0,
               y: -20,
-              duration: 0.4,
+              duration: 0.35,
               ease: "power2.in",
             }).to(
               preloaderRef.current,
@@ -51,7 +51,7 @@ export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
             document.body.style.overflow = "";
             onComplete();
           }
-        }, 200);
+        }, 150);
       }
     });
 

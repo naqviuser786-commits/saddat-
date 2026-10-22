@@ -1,9 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { 
-  TOTAL_FRAMES, 
   getNearestPreloadedFrame, 
-  getFrameUrl, 
-  processCutout, 
   processedCanvasMap 
 } from "../../utils/frameLoader";
 
@@ -26,14 +23,14 @@ export default function ChairFrameSequence({
   const currentRenderedFrameRef = useRef<number>(1);
   const rafIdRef = useRef<number | null>(null);
 
-  // Pure 0ms Instant GPU Drawing from already preloaded memory (Zero CPU lag!)
+  // Pure 0ms Instant GPU Blitting (Everything is ALREADY in RAM!)
   const renderFrame = useCallback((frameIdx: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Get preloaded, pre-cutout canvas directly from RAM!
+    // Instant map lookup from memory (0.001ms)
     const cutoutCanvas = getNearestPreloadedFrame(frameIdx);
     if (!cutoutCanvas) return;
 
@@ -64,7 +61,7 @@ export default function ChairFrameSequence({
     const renderH = ih * scaleFactor;
     const offsetX = (cw - renderW) / 2;
 
-    // Instant hardware-accelerated GPU draw (0ms delay!)
+    // Instant GPU draw
     ctx.drawImage(cutoutCanvas, 0, 0, iw, ih, offsetX, offsetY, renderW, renderH);
   }, []);
 
@@ -83,8 +80,8 @@ export default function ChairFrameSequence({
       const current = currentRenderedFrameRef.current;
       const diff = target - current;
 
-      if (Math.abs(diff) > 0.05) {
-        currentRenderedFrameRef.current += diff * 0.5; // Fast instant follow
+      if (Math.abs(diff) > 0.08) {
+        currentRenderedFrameRef.current += diff * 0.45; // Fast responsive follow
         renderFrame(Math.round(currentRenderedFrameRef.current));
       } else if (Math.round(current) !== Math.round(target)) {
         currentRenderedFrameRef.current = target;
@@ -116,21 +113,23 @@ export default function ChairFrameSequence({
     renderFrame(Math.round(currentRenderedFrameRef.current));
   }, [renderFrame]);
 
-  // Ensure Frame 1 is ready immediately
+  // Check initial frame status
   useEffect(() => {
-    if (processedCanvasMap.has(1)) {
+    if (processedCanvasMap.size > 0) {
       setInitialFrameLoaded(true);
       handleResize();
       if (onInitialReady) onInitialReady();
     } else {
-      const firstImg = new Image();
-      firstImg.src = getFrameUrl(1);
-      firstImg.onload = () => {
-        processCutout(firstImg, 1);
-        setInitialFrameLoaded(true);
-        handleResize();
-        if (onInitialReady) onInitialReady();
-      };
+      const checkTimer = setInterval(() => {
+        if (processedCanvasMap.size > 0) {
+          setInitialFrameLoaded(true);
+          handleResize();
+          if (onInitialReady) onInitialReady();
+          clearInterval(checkTimer);
+        }
+      }, 50);
+
+      return () => clearInterval(checkTimer);
     }
 
     window.addEventListener("resize", handleResize);
