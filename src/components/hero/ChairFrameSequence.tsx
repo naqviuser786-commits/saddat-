@@ -1,8 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { 
-  getNearestPreloadedFrame, 
-  processedCanvasMap 
-} from "../../utils/frameLoader";
+import { getNearestPreloadedFrame } from "../../utils/frameLoader";
 
 interface ChairFrameSequenceProps {
   currentFrame: number;
@@ -18,19 +15,17 @@ export default function ChairFrameSequence({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const [initialFrameLoaded, setInitialFrameLoaded] = useState(false);
   const targetFrameRef = useRef<number>(1);
   const currentRenderedFrameRef = useRef<number>(1);
   const rafIdRef = useRef<number | null>(null);
 
-  // Pure 0ms Instant GPU Blitting (Everything is ALREADY in RAM!)
+  // Instant 0ms GPU Drawing
   const renderFrame = useCallback((frameIdx: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Instant map lookup from memory (0.001ms)
     const cutoutCanvas = getNearestPreloadedFrame(frameIdx);
     if (!cutoutCanvas) return;
 
@@ -61,7 +56,6 @@ export default function ChairFrameSequence({
     const renderH = ih * scaleFactor;
     const offsetX = (cw - renderW) / 2;
 
-    // Instant GPU draw
     ctx.drawImage(cutoutCanvas, 0, 0, iw, ih, offsetX, offsetY, renderW, renderH);
   }, []);
 
@@ -69,19 +63,18 @@ export default function ChairFrameSequence({
     targetFrameRef.current = currentFrame;
   }, [currentFrame]);
 
-  // HIGH-SPEED 60-120FPS RAF PLAYBACK ENGINE
+  // Smooth 60fps RAF Loop
   useEffect(() => {
     let active = true;
 
     const tick = () => {
       if (!active) return;
-
       const target = targetFrameRef.current;
       const current = currentRenderedFrameRef.current;
       const diff = target - current;
 
-      if (Math.abs(diff) > 0.08) {
-        currentRenderedFrameRef.current += diff * 0.45; // Fast responsive follow
+      if (Math.abs(diff) > 0.05) {
+        currentRenderedFrameRef.current += diff * 0.40;
         renderFrame(Math.round(currentRenderedFrameRef.current));
       } else if (Math.round(current) !== Math.round(target)) {
         currentRenderedFrameRef.current = target;
@@ -113,25 +106,9 @@ export default function ChairFrameSequence({
     renderFrame(Math.round(currentRenderedFrameRef.current));
   }, [renderFrame]);
 
-  // Check initial frame status
   useEffect(() => {
-    if (processedCanvasMap.size > 0) {
-      setInitialFrameLoaded(true);
-      handleResize();
-      if (onInitialReady) onInitialReady();
-    } else {
-      const checkTimer = setInterval(() => {
-        if (processedCanvasMap.size > 0) {
-          setInitialFrameLoaded(true);
-          handleResize();
-          if (onInitialReady) onInitialReady();
-          clearInterval(checkTimer);
-        }
-      }, 50);
-
-      return () => clearInterval(checkTimer);
-    }
-
+    handleResize();
+    if (onInitialReady) onInitialReady();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [handleResize, onInitialReady]);
@@ -143,10 +120,7 @@ export default function ChairFrameSequence({
     >
       <canvas
         ref={canvasRef}
-        className="w-full h-full object-contain pointer-events-none select-none transition-opacity duration-300 relative z-10"
-        style={{
-          opacity: initialFrameLoaded ? 1 : 0,
-        }}
+        className="w-full h-full object-contain pointer-events-none select-none relative z-10 opacity-100"
       />
     </div>
   );

@@ -30,8 +30,8 @@ interface FeatureCallout {
 
 const ROTATION_CALLOUTS: FeatureCallout[] = [
   {
-    start: 0.14,
-    end: 0.32,
+    start: 0.12,
+    end: 0.28,
     number: "01",
     title: "High-Tensile AeroMesh",
     subtitle: "ANATOMICAL SPINAL TRACKING",
@@ -39,8 +39,8 @@ const ROTATION_CALLOUTS: FeatureCallout[] = [
     alignment: "left",
   },
   {
-    start: 0.38,
-    end: 0.56,
+    start: 0.32,
+    end: 0.48,
     number: "02",
     title: "Synchronous Kinematics",
     subtitle: "COLD-FORGED ALLOY CORE",
@@ -48,8 +48,8 @@ const ROTATION_CALLOUTS: FeatureCallout[] = [
     alignment: "right",
   },
   {
-    start: 0.62,
-    end: 0.80,
+    start: 0.52,
+    end: 0.68,
     number: "03",
     title: "Class-4 Star Base",
     subtitle: "BIFMA X5.1 CERTIFIED",
@@ -65,7 +65,7 @@ export default function LuxuryHero() {
   const [currentFrame, setCurrentFrame] = useState<number>(1);
   const [scrollProgress, setScrollProgress] = useState<number>(0);
 
-  // Instant 1:1 Responsive Scrubbing (scrub: 0.15 = Zero lag!)
+  // Clean Natural Pinning: pinSpacing: false prevents layout clashes
   useEffect(() => {
     if (!containerRef.current || !pinStageRef.current) return;
 
@@ -75,21 +75,20 @@ export default function LuxuryHero() {
         start: "top top",
         end: "bottom bottom",
         pin: pinStageRef.current,
-        pinSpacing: true,
-        scrub: 0.15, // Responsive immediate tracking
+        pinSpacing: false,
+        scrub: 0.35,
         anticipatePin: 1,
         onUpdate: (self) => {
           const prog = self.progress;
+          setScrollProgress(prog);
 
-          const chairProgress = Math.min(1, Math.max(0, prog / 0.84));
+          // Chair spins smoothly from 0% to 75% of scroll
+          const chairProgress = Math.min(1, Math.max(0, prog / 0.75));
           const targetFrame = Math.min(
             TOTAL_FRAMES,
             Math.max(1, Math.round(chairProgress * (TOTAL_FRAMES - 1)) + 1)
           );
-
-          // Prevent unnecessary React re-renders if frame didn't change!
-          setCurrentFrame((prev) => (prev !== targetFrame ? targetFrame : prev));
-          setScrollProgress((prev) => (Math.abs(prev - prog) > 0.005 ? prog : prev));
+          setCurrentFrame(targetFrame);
         },
       });
     }, containerRef);
@@ -106,13 +105,13 @@ export default function LuxuryHero() {
 
   // Phase 2: Finale Chair Position
   const chairStageStyles = useMemo(() => {
-    if (scrollProgress < 0.84) {
+    if (scrollProgress < 0.75) {
       return {
         transform: "translate3d(0, 0, 0) scale(1)",
         opacity: 1,
       };
     }
-    const t = Math.min(1, (scrollProgress - 0.84) / 0.14);
+    const t = Math.min(1, (scrollProgress - 0.75) / 0.20);
     const translateX = window.innerWidth >= 1024 ? t * 14 : 0;
     return {
       transform: `translate3d(${translateX}%, 0, 0) scale(1.02)`,
@@ -122,9 +121,9 @@ export default function LuxuryHero() {
 
   // Phase 3: Grand Editorial Hero Revelation
   const heroRevealProgress = useMemo(() => {
-    if (scrollProgress < 0.84) return 0;
-    if (scrollProgress >= 0.98) return 1;
-    return (scrollProgress - 0.84) / 0.14;
+    if (scrollProgress < 0.75) return 0;
+    if (scrollProgress >= 0.95) return 1;
+    return (scrollProgress - 0.75) / 0.20;
   }, [scrollProgress]);
 
   const heroTranslateY = (1 - heroRevealProgress) * 35;
@@ -134,10 +133,10 @@ export default function LuxuryHero() {
       ref={containerRef}
       className="relative w-full bg-[#18110B] text-stone-100"
       style={{
-        height: "450vh",
+        height: "400vh",
       }}
     >
-      {/* Pinned 100vh Architectural Stage */}
+      {/* Pinned 100vh Stage */}
       <div
         ref={pinStageRef}
         className="w-full h-screen overflow-hidden relative flex flex-col justify-between"
@@ -145,10 +144,8 @@ export default function LuxuryHero() {
           background: "radial-gradient(ellipse at 50% 50%, #2B1C12 0%, #1E130B 50%, #120B07 100%)",
         }}
       >
-        {/* Navigation */}
         <HeroNavigation />
 
-        {/* Architectural Walnut Slat Paneling Texture */}
         <div 
           className="absolute inset-0 pointer-events-none opacity-20"
           style={{
@@ -156,7 +153,7 @@ export default function LuxuryHero() {
           }}
         />
 
-        {/* 1. CHAIR CANVAS (Zero lag, pure 60fps) */}
+        {/* 1. CHAIR CANVAS (Zero lag, instant draw) */}
         <div 
           className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none z-10 transition-transform duration-500 ease-out"
           style={chairStageStyles}
@@ -167,7 +164,7 @@ export default function LuxuryHero() {
           />
         </div>
 
-        {/* 2. INITIAL PHASE: "Scroll to Inspect 360°" Notice */}
+        {/* 2. INITIAL PHASE: Notice */}
         <div
           className="relative z-30 w-full max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 pt-32 sm:pt-36 pointer-events-none transition-opacity duration-300 text-left"
           style={{
@@ -244,7 +241,7 @@ export default function LuxuryHero() {
           </div>
         </div>
 
-        {/* 4. FINALE: ARCHITECTURAL WALNUT WOOD & CHAMPAGNE GOLD EDITORIAL STORY */}
+        {/* 4. FINALE: EDITORIAL STORY */}
         <div
           className="absolute inset-0 z-40 flex items-center justify-start pointer-events-none transition-all duration-300 text-left"
           style={{
@@ -255,7 +252,6 @@ export default function LuxuryHero() {
         >
           <div className="w-full max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-8 pointer-events-auto">
             <div className="max-w-2xl bg-[#1C120B]/95 backdrop-blur-xl p-8 sm:p-12 border border-[#C5A880]/35 shadow-2xl relative">
-              
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#C5A880] via-[#E8D1B0] to-[#8C6D46]" />
 
               <div className="inline-flex items-center gap-2 text-[10px] sm:text-xs font-mono tracking-[0.28em] text-[#E0C6A0] uppercase font-semibold mb-4">
@@ -308,7 +304,6 @@ export default function LuxuryHero() {
                   <span>Corporate WhatsApp Desk</span>
                 </a>
               </div>
-
             </div>
           </div>
         </div>
@@ -333,7 +328,7 @@ export default function LuxuryHero() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            {scrollProgress < 0.84 ? (
+            {scrollProgress < 0.75 ? (
               <span className="animate-pulse text-[#C5A880]">SCROLL TO ROTATE 360°</span>
             ) : (
               <span className="text-[#E0C6A0] font-bold">ATELIER SHOWCASE ACTIVE</span>

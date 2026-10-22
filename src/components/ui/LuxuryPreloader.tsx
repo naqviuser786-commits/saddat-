@@ -8,54 +8,63 @@ interface LuxuryPreloaderProps {
 
 export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
   const [progress, setProgress] = useState<number>(0);
-  const [statusText, setStatusText] = useState<string>("BUFFERING 360° ATELIER ASSETS...");
+  const [statusText, setStatusText] = useState<string>("INITIALIZING 360° ATELIER...");
   const preloaderRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const isFinishedRef = useRef<boolean>(false);
 
   useEffect(() => {
+    // Lock scroll temporarily
     document.body.style.overflow = "hidden";
 
-    // Start Real 64-Frame Fast Preload (Takes ~1.5 to 2 seconds total!)
+    const handleComplete = () => {
+      if (isFinishedRef.current) return;
+      isFinishedRef.current = true;
+      document.body.style.overflow = "";
+
+      if (preloaderRef.current && contentRef.current) {
+        const tl = gsap.timeline({
+          onComplete: () => {
+            document.body.style.overflow = "";
+            onComplete();
+          },
+        });
+
+        tl.to(contentRef.current, {
+          opacity: 0,
+          y: -20,
+          duration: 0.35,
+          ease: "power2.in",
+        }).to(
+          preloaderRef.current,
+          {
+            yPercent: -100,
+            duration: 0.65,
+            ease: "power4.inOut",
+          },
+          "-=0.1"
+        );
+      } else {
+        document.body.style.overflow = "";
+        onComplete();
+      }
+    };
+
+    // Start fast real preload
     preloadAll360Frames((pct, status) => {
       setProgress(pct);
       setStatusText(status);
 
-      if (pct >= 100 && !isFinishedRef.current) {
-        isFinishedRef.current = true;
-
-        setTimeout(() => {
-          if (preloaderRef.current && contentRef.current) {
-            const tl = gsap.timeline({
-              onComplete: () => {
-                document.body.style.overflow = "";
-                onComplete();
-              },
-            });
-
-            tl.to(contentRef.current, {
-              opacity: 0,
-              y: -20,
-              duration: 0.35,
-              ease: "power2.in",
-            }).to(
-              preloaderRef.current,
-              {
-                yPercent: -100,
-                duration: 0.75,
-                ease: "power4.inOut",
-              },
-              "-=0.1"
-            );
-          } else {
-            document.body.style.overflow = "";
-            onComplete();
-          }
-        }, 150);
+      if (pct >= 100) {
+        setTimeout(handleComplete, 100);
       }
     });
 
+    // Guaranteed Safety: 2.5s se zyada kabhi lock nahi rahega!
+    const safetyTimer = setTimeout(handleComplete, 2600);
+
     return () => {
+      clearTimeout(safetyTimer);
       document.body.style.overflow = "";
     };
   }, [onComplete]);
@@ -68,7 +77,6 @@ export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
         background: "radial-gradient(ellipse at 50% 50%, #1E120A 0%, #0E0804 100%)",
       }}
     >
-      {/* Top Header Label */}
       <div className="flex items-center justify-between text-xs font-mono text-stone-400">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#C5A880] animate-pulse" />
@@ -81,7 +89,6 @@ export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
         </span>
       </div>
 
-      {/* Center Monogram & Real Numerical Counter */}
       <div ref={contentRef} className="max-w-md mx-auto text-center space-y-6 my-auto">
         <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto border border-[#C5A880]/50 bg-[#1A100A] flex items-center justify-center text-white font-extrabold text-2xl sm:text-3xl shadow-[0_0_35px_rgba(197,168,128,0.25)] relative">
           <span>S</span>
@@ -98,7 +105,6 @@ export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
           </p>
         </div>
 
-        {/* Real Percentage Display */}
         <div className="text-5xl sm:text-7xl font-serif font-light text-transparent bg-clip-text bg-gradient-to-r from-[#C5A880] via-[#F4E3CB] to-[#E0C6A0] tracking-tight">
           {String(progress).padStart(2, "0")}
           <span className="text-xl sm:text-2xl font-mono text-[#C5A880] ml-1">%</span>
@@ -108,7 +114,6 @@ export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
           {statusText}
         </p>
 
-        {/* Real Progress Bar */}
         <div className="w-full max-w-xs mx-auto h-[2px] bg-white/10 relative overflow-hidden">
           <div
             className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-[#C5A880] via-[#F4E3CB] to-[#C5A880] shadow-[0_0_12px_#C5A880] transition-all duration-75"
