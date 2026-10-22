@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 
 export const TOTAL_FRAMES = 960;
-const MAX_CACHE_SIZE = 80; // Keeps memory strictly under ~120MB (Zero GC stutter)
+const MAX_CACHE_SIZE = 60; // Lightweight RAM footprint for mobile devices
 
 interface ChairFrameSequenceProps {
   currentFrame: number;
@@ -17,9 +17,7 @@ export default function ChairFrameSequence({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Single reusable processing canvas (Prevents heavy DOM allocations on scroll)
   const workerCanvasRef = useRef<HTMLCanvasElement | null>(null);
-
   const rawImagesRef = useRef<(HTMLImageElement | null)[]>(new Array(TOTAL_FRAMES + 1).fill(null));
   const isLoadedRef = useRef<boolean[]>(new Array(TOTAL_FRAMES + 1).fill(false));
   const cutoutCacheRef = useRef<Map<number, HTMLCanvasElement>>(new Map());
@@ -29,6 +27,11 @@ export default function ChairFrameSequence({
   const targetFrameRef = useRef<number>(1);
   const currentRenderedFrameRef = useRef<number>(1);
   const rafIdRef = useRef<number | null>(null);
+
+  // Detect mobile device
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  // On mobile, load every 6th frame (160 frames total = 85% data savings & ZERO lag!)
+  const frameStep = isMobile ? 6 : 2;
 
   const getFrameUrl = useCallback((index: number) => {
     const padded = String(index).padStart(3, "0");
@@ -44,7 +47,6 @@ export default function ChairFrameSequence({
     const iw = img.naturalWidth || 1280;
     const ih = img.naturalHeight || 720;
 
-    // Reuse worker canvas to prevent memory allocations
     if (!workerCanvasRef.current) {
       workerCanvasRef.current = document.createElement("canvas");
       workerCanvasRef.current.width = iw;
@@ -58,7 +60,6 @@ export default function ChairFrameSequence({
 
     try {
       const imgData = workerCtx.getImageData(0, 0, iw, ih);
-      // 32-bit Integer view: processes 4 bytes (RGBA) in a single CPU instruction!
       const data32 = new Uint32Array(imgData.data.buffer);
       const totalPixels = data32.length;
 
@@ -89,7 +90,6 @@ export default function ChairFrameSequence({
 
         // 2. Ground floor shadow puddle (y >= 87%)
         if (y >= groundFloorY) {
-          // Keep crisp black wheels
           if (r < 65 && g < 65 && b < 65) {
             continue;
           }
@@ -99,19 +99,17 @@ export default function ChairFrameSequence({
           }
         }
 
-        // 3. Studio wall background (Behind mesh & frame)
+        // 3. Studio wall background
         if (diff < 26 && minC > 115) {
           if (minC > 160) {
             data32[i] = 0;
           } else {
-            // Smooth alpha feathering
             const alpha = Math.round(255 * ((160 - minC) / 45));
             data32[i] = (alpha << 24) | (b << 16) | (g << 8) | r;
           }
           continue;
         }
 
-        // Light bleed cleanup
         if (minC > 175) {
           data32[i] = 0;
         }
@@ -119,14 +117,12 @@ export default function ChairFrameSequence({
 
       workerCtx.putImageData(imgData, 0, 0);
 
-      // Create output canvas for cache
       const cached = document.createElement("canvas");
       cached.width = iw;
       cached.height = ih;
       const cCtx = cached.getContext("2d");
       if (cCtx) cCtx.drawImage(workerCanvas, 0, 0);
 
-      // LRU Cache Management (Delete oldest item if cache exceeds limit)
       if (cutoutCacheRef.current.size >= MAX_CACHE_SIZE) {
         const firstKey = cutoutCacheRef.current.keys().next().value;
         if (firstKey !== undefined) cutoutCacheRef.current.delete(firstKey);
@@ -139,11 +135,13 @@ export default function ChairFrameSequence({
     }
   }, []);
 
+  // Snap to nearest loaded keyframe on mobile
   const getNearestLoadedFrameIndex = useCallback((target: number): number => {
     const loaded = isLoadedRef.current;
     if (loaded[target]) return target;
 
-    for (let offset = 1; offset <= 24; offset++) {
+    // Search outward for nearest loaded keyframe
+    for (let offset = 1; offset <= 36; offset++) {
       const fwd = target + offset;
       if (fwd <= TOTAL_FRAMES && loaded[fwd]) return fwd;
       const bwd = target - offset;
@@ -202,7 +200,7 @@ export default function ChairFrameSequence({
     targetFrameRef.current = currentFrame;
   }, [currentFrame]);
 
-  // HIGH-PERFORMANCE 60FPS RAF LOOP (Zero Lag Damping)
+  // HIGH-PERFORMANCE 60FPS RAF LOOP (Buttery Smooth Damping)
   useEffect(() => {
     let active = true;
 
@@ -214,8 +212,7 @@ export default function ChairFrameSequence({
       const diff = target - current;
 
       if (Math.abs(diff) > 0.08) {
-        // Fast, immediate tracking (increased from 0.18 to 0.45)
-        currentRenderedFrameRef.current += diff * 0.45;
+        currentRenderedFrameRef.current += diff * 0.40;
         renderFrame(Math.round(currentRenderedFrameRef.current));
       } else if (Math.round(current) !== Math.round(target)) {
         currentRenderedFrameRef.current = target;
@@ -247,6 +244,7 @@ export default function ChairFrameSequence({
     renderFrame(Math.round(currentRenderedFrameRef.current));
   }, [renderFrame]);
 
+  // 1. Load initial frame instantly
   useEffect(() => {
     const firstImg = new Image();
     firstImg.src = getFrameUrl(1);
@@ -263,12 +261,14 @@ export default function ChairFrameSequence({
     return () => window.removeEventListener("resize", handleResize);
   }, [getFrameUrl, handleResize, onInitialReady, processWhiteCutout]);
 
+  // 2. Mobile-Friendly Lazy Batch Streamer
   useEffect(() => {
     if (!initialFrameLoaded) return;
     let isCancelled = false;
 
+    // Build keyframes based on device step (every 6th on mobile, every 2nd on desktop)
     const keyframes: number[] = [];
-    for (let i = 1; i <= TOTAL_FRAMES; i += 4) {
+    for (let i = 1; i <= TOTAL_FRAMES; i += frameStep) {
       if (i !== 1) keyframes.push(i);
     }
     if (!keyframes.includes(TOTAL_FRAMES)) keyframes.push(TOTAL_FRAMES);
@@ -276,7 +276,8 @@ export default function ChairFrameSequence({
     let idx = 0;
     const loadNextBatch = () => {
       if (isCancelled || idx >= keyframes.length) return;
-      const end = Math.min(idx + 16, keyframes.length);
+      const batchSize = isMobile ? 8 : 14;
+      const end = Math.min(idx + batchSize, keyframes.length);
 
       for (let k = idx; k < end; k++) {
         const f = keyframes[k];
@@ -292,22 +293,23 @@ export default function ChairFrameSequence({
         }
       }
       idx = end;
-      setTimeout(loadNextBatch, 20);
+      setTimeout(loadNextBatch, isMobile ? 40 : 20);
     };
 
-    const timer = setTimeout(loadNextBatch, 30);
+    const timer = setTimeout(loadNextBatch, 50);
     return () => {
       isCancelled = true;
       clearTimeout(timer);
     };
-  }, [initialFrameLoaded, getFrameUrl]);
+  }, [initialFrameLoaded, getFrameUrl, frameStep, isMobile]);
 
+  // 3. Quick on-demand lookahead buffer
   useEffect(() => {
-    const lookahead = 20;
+    const lookahead = isMobile ? 8 : 16;
     const start = Math.max(1, currentFrame - lookahead);
     const end = Math.min(TOTAL_FRAMES, currentFrame + lookahead);
 
-    for (let f = start; f <= end; f++) {
+    for (let f = start; f <= end; f += (isMobile ? 3 : 1)) {
       if (!rawImagesRef.current[f]) {
         const img = new Image();
         img.src = getFrameUrl(f);
@@ -317,7 +319,7 @@ export default function ChairFrameSequence({
         };
       }
     }
-  }, [currentFrame, getFrameUrl]);
+  }, [currentFrame, getFrameUrl, isMobile]);
 
   return (
     <div
