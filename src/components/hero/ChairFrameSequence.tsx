@@ -1,5 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { getNearestPreloadedFrame } from "../../utils/frameLoader";
+import { 
+  TOTAL_FRAMES,
+  getNearestPreloadedFrame 
+} from "../../utils/frameLoader";
+
+// Export TOTAL_FRAMES taake LuxuryHero.tsx isay direct import kar sake
+export { TOTAL_FRAMES };
 
 interface ChairFrameSequenceProps {
   currentFrame: number;
@@ -19,7 +25,7 @@ export default function ChairFrameSequence({
   const currentRenderedFrameRef = useRef<number>(1);
   const rafIdRef = useRef<number | null>(null);
 
-  // Instant 0ms GPU Drawing
+  // Instant 0ms GPU Drawing from Preloaded Memory
   const renderFrame = useCallback((frameIdx: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
