@@ -1,80 +1,61 @@
 import React, { useEffect, useState, useRef } from "react";
 import gsap from "gsap";
+import { preloadAll360Frames } from "../../utils/frameLoader";
 
 interface LuxuryPreloaderProps {
   onComplete: () => void;
 }
 
-// Only preload Frame 1 so the page opens IMMEDIATELY in under 1 second!
-const CRITICAL_ASSET = "/all-frames/ezgif-frame-001.png";
-
 export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
   const [progress, setProgress] = useState<number>(0);
-  const [statusText, setStatusText] = useState<string>("INITIALIZING ATELIER CORE...");
+  const [statusText, setStatusText] = useState<string>("INITIALIZING 360° ATELIER FRAMES...");
   const preloaderRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const isFinishedRef = useRef<boolean>(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
 
-    let isFinished = false;
+    // Start REAL frame loading
+    preloadAll360Frames((pct, status) => {
+      setProgress(pct);
+      setStatusText(status);
 
-    // Load Frame 1 immediately
-    const img = new Image();
-    img.src = CRITICAL_ASSET;
+      if (pct >= 100 && !isFinishedRef.current) {
+        isFinishedRef.current = true;
 
-    // Fast, crisp progress bar (Finishes in ~800ms)
-    let currentProg = 0;
-    const interval = setInterval(() => {
-      currentProg += Math.floor(Math.random() * 15) + 8;
+        setTimeout(() => {
+          if (preloaderRef.current && contentRef.current) {
+            const tl = gsap.timeline({
+              onComplete: () => {
+                document.body.style.overflow = "";
+                onComplete();
+              },
+            });
 
-      if (currentProg >= 100) {
-        currentProg = 100;
-        clearInterval(interval);
-        setStatusText("ATELIER READY // ENTERING WORKSPACE");
-
-        if (!isFinished) {
-          isFinished = true;
-          setTimeout(() => {
-            if (preloaderRef.current && contentRef.current) {
-              const tl = gsap.timeline({
-                onComplete: () => {
-                  document.body.style.overflow = "";
-                  onComplete();
-                },
-              });
-
-              tl.to(contentRef.current, {
-                opacity: 0,
-                y: -20,
-                duration: 0.35,
-                ease: "power2.in",
-              }).to(
-                preloaderRef.current,
-                {
-                  yPercent: -100,
-                  duration: 0.65,
-                  ease: "power4.inOut",
-                },
-                "-=0.1"
-              );
-            } else {
-              document.body.style.overflow = "";
-              onComplete();
-            }
-          }, 150);
-        }
-      } else if (currentProg > 65) {
-        setStatusText("CALIBRATING 360° SPATIAL RENDERING...");
-      } else if (currentProg > 30) {
-        setStatusText("SYNCHRONIZING ATELIER ASSETS...");
+            tl.to(contentRef.current, {
+              opacity: 0,
+              y: -20,
+              duration: 0.4,
+              ease: "power2.in",
+            }).to(
+              preloaderRef.current,
+              {
+                yPercent: -100,
+                duration: 0.75,
+                ease: "power4.inOut",
+              },
+              "-=0.1"
+            );
+          } else {
+            document.body.style.overflow = "";
+            onComplete();
+          }
+        }, 200);
       }
-
-      setProgress(currentProg);
-    }, 28);
+    });
 
     return () => {
-      clearInterval(interval);
       document.body.style.overflow = "";
     };
   }, [onComplete]);
@@ -100,7 +81,7 @@ export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
         </span>
       </div>
 
-      {/* Center Monogram & Numerical Counter */}
+      {/* Center Monogram & Real Numerical Counter */}
       <div ref={contentRef} className="max-w-md mx-auto text-center space-y-6 my-auto">
         <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto border border-[#C5A880]/50 bg-[#1A100A] flex items-center justify-center text-white font-extrabold text-2xl sm:text-3xl shadow-[0_0_35px_rgba(197,168,128,0.25)] relative">
           <span>S</span>
@@ -117,6 +98,7 @@ export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
           </p>
         </div>
 
+        {/* Real Percentage Display */}
         <div className="text-5xl sm:text-7xl font-serif font-light text-transparent bg-clip-text bg-gradient-to-r from-[#C5A880] via-[#F4E3CB] to-[#E0C6A0] tracking-tight">
           {String(progress).padStart(2, "0")}
           <span className="text-xl sm:text-2xl font-mono text-[#C5A880] ml-1">%</span>
@@ -126,6 +108,7 @@ export default function LuxuryPreloader({ onComplete }: LuxuryPreloaderProps) {
           {statusText}
         </p>
 
+        {/* Real Progress Bar */}
         <div className="w-full max-w-xs mx-auto h-[2px] bg-white/10 relative overflow-hidden">
           <div
             className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-[#C5A880] via-[#F4E3CB] to-[#C5A880] shadow-[0_0_12px_#C5A880] transition-all duration-75"
